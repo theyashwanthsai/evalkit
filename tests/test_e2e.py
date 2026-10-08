@@ -105,3 +105,28 @@ def test_init_and_report(proj, capsys):
     assert (proj / "fresh/.github/workflows/evalkit-online.yml").exists()
     assert main(["report"]) == 0
     assert "evalkit report" in capsys.readouterr().out
+
+
+def test_version_resolution(tmp_path, monkeypatch):
+    from evalkit import version
+    monkeypatch.chdir(tmp_path)  # no git repo here
+    for v in ("EVALKIT_VERSION", *version.PLATFORM_SHA_VARS):
+        monkeypatch.delenv(v, raising=False)
+    monkeypatch.setattr(version, "_warned", False)
+    assert version.agent_version() == "unknown"
+    assert version._warned
+    monkeypatch.setenv("VERCEL_GIT_COMMIT_SHA", "abcdef1234567")
+    assert version.agent_version() == "abcdef1"
+    monkeypatch.setenv("EVALKIT_VERSION", "v3")
+    assert version.agent_version() == "v3"
+
+
+def test_version_path_scoped_tags(tmp_path, monkeypatch):
+    import subprocess
+    from evalkit import version
+    monkeypatch.delenv("EVALKIT_VERSION", raising=False)
+    g = lambda *a: subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=tmp_path, check=True, capture_output=True)
+    g("init", "-q"); (tmp_path / "f").write_text("1"); g("add", "."); g("commit", "-qm", "1")
+    g("tag", "jobs-agent/v1.2"); g("tag", "other-agent/v9")
+    assert version.agent_version("jobs-agent", cwd=str(tmp_path)) == "jobs-agent/v1.2"
+    assert version.agent_version("other-agent", cwd=str(tmp_path)) == "other-agent/v9"
