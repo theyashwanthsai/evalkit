@@ -10,7 +10,7 @@ graph = create_react_agent(ChatOpenAI(model="gpt-6-luna"), [tool(jobs.search_job
 
 def answer(user_input: str) -> dict:
     jobs.calls.clear()
-    out = graph.invoke({"messages": [("user", user_input)]})["messages"][-1].content
+    out = graph.invoke({"messages": [("user", user_input)]})["messages"][-1].text
     return {"output": out, "steps": list(jobs.calls)}
 
 
