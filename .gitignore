@@ -6,3 +6,4 @@ dist/
 .env
 examples/**/.evals/
 examples/**/.traces/
+vision.md
