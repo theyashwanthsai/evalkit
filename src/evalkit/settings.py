@@ -5,7 +5,7 @@ import os
 from typing import Callable
 
 from .config import load_config
-from .sinks import LocalSink, Sink
+from .sinks import GitHubSink, LocalSink, Sink
 
 _state: dict = {"agent": None, "sink": None, "redact": None}
 _cached: tuple[tuple, Sink] | None = None
@@ -28,11 +28,19 @@ def get_redact() -> Callable[[dict], dict] | None:
 
 
 def get_sink() -> Sink:
+    """Sink from configure(), else evalkit.yaml `traces:` / EVALKIT_TRACES_REPO, else local files."""
     global _cached
     if _state["sink"]:
         return _state["sink"]
     cfg = load_config()
-    spec = (cfg.traces_dir,)
+    t = cfg.traces
+    repo = os.environ.get("EVALKIT_TRACES_REPO") or (t.get("repo") if t.get("sink") == "github" else None)
+    spec = (cfg.traces_dir, repo, t.get("branch"), t.get("batch_size"), t.get("flush_interval"))
     if _cached is None or _cached[0] != spec:
-        _cached = (spec, LocalSink(cfg.traces_dir))
+        if repo:
+            kw = {k: t[k] for k in ("batch_size", "flush_interval") if k in t}
+            sink: Sink = GitHubSink(repo, branch=t.get("branch"), **kw)
+        else:
+            sink = LocalSink(cfg.traces_dir)
+        _cached = (spec, sink)
     return _cached[1]

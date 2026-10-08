@@ -175,3 +175,71 @@ def test_redact_hook(proj, monkeypatch):
         settings._state["redact"] = None
     assert t["input"] == "<redacted>"
     assert load_traces()[0]["input"] == "<redacted>"
+
+
+class FakeGitHub:
+    """Tiny local stand-in for the GitHub contents API."""
+    def __init__(self, fail=False):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        self.files, self.fail, outer = {}, fail, self
+
+        class H(BaseHTTPRequestHandler):
+            def do_PUT(self):
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                if outer.fail or self.headers.get("Authorization") != "Bearer tok":
+                    self.send_response(401 if not outer.fail else 500); self.end_headers(); self.wfile.write(b"{}"); return
+                import base64
+                outer.files[self.path] = (base64.b64decode(body["content"]).decode(), body.get("branch"))
+                self.send_response(201); self.end_headers(); self.wfile.write(b"{}")
+            def log_message(self, *a): pass
+
+        self.srv = HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{self.srv.server_port}"
+
+
+def test_github_sink_batches_per_agent_and_day(proj):
+    from evalkit.sinks import GitHubSink
+    gh = FakeGitHub()
+    sink = GitHubSink("me/traces", branch="traces", token="tok", batch_size=100, api=gh.url)
+    ts = "2026-10-08T01:00:00+00:00"
+    for i in range(3):
+        sink.write({"id": f"a{i}", "agent": "jobs", "timestamp": ts, "input": i})
+    sink.write({"id": "b0", "agent": "support", "timestamp": ts, "input": 9})
+    assert gh.files == {}            # nothing sent until a flush
+    sink.flush()
+    assert len(gh.files) == 2        # one file per agent/day, not per trace
+    paths = sorted(gh.files)
+    assert paths[0].startswith("/repos/me/traces/contents/jobs/2026-10-08/") and paths[0].endswith(".jsonl")
+    content, branch = gh.files[paths[0]]
+    assert branch == "traces" and len(content.strip().splitlines()) == 3
+
+
+def test_github_sink_failure_keeps_traces_and_never_raises(proj, capsys):
+    from evalkit.sinks import GitHubSink
+    gh = FakeGitHub(fail=True)
+    sink = GitHubSink("me/traces", token="tok", api=gh.url)
+    sink.write({"id": "a", "agent": "jobs", "timestamp": "2026-10-08T01:00:00+00:00"})
+    sink.flush()                     # must not raise
+    assert "flush failed" in capsys.readouterr().err and len(sink._buf) == 1
+    gh.fail = False
+    sink.flush()
+    assert len(gh.files) == 1 and sink._buf == []
+
+
+def test_github_sink_needs_token(monkeypatch):
+    from evalkit.sinks import GitHubSink
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False); monkeypatch.delenv("EVALKIT_GITHUB_TOKEN", raising=False)
+    with pytest.raises(ValueError, match="token"):
+        GitHubSink("me/traces")
+
+
+def test_sink_chosen_from_config(proj, monkeypatch):
+    from evalkit import settings
+    from evalkit.sinks import GitHubSink, LocalSink
+    monkeypatch.setenv("GITHUB_TOKEN", "tok")
+    assert isinstance(settings.get_sink(), LocalSink)
+    (proj / "evalkit.yaml").write_text("agent_name: jobs\ntraces:\n  sink: github\n  repo: me/traces\n  branch: main\n")
+    s = settings.get_sink()
+    assert isinstance(s, GitHubSink) and s.repo == "me/traces" and s.branch == "main"

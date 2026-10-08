@@ -19,6 +19,7 @@ class Config:
     sample_size: int = 20
     window_hours: float = 24
     include_errors: int = 3
+    traces: dict = field(default_factory=dict)   # sink config: {sink: github, repo, branch, ...}
 
 
 def load_config(path: str | Path = "evalkit.yaml") -> Config:
@@ -31,6 +32,7 @@ def load_config(path: str | Path = "evalkit.yaml") -> Config:
     for k in ("agent", "agent_name", "traces_dir", "results_dir", "datasets", "judges_dir"):
         if k in d:
             setattr(c, k, d[k])
+    c.traces = d.get("traces", {})
     c.repeats = off.get("repeats", c.repeats)
     c.regression_threshold = off.get("regression_threshold", c.regression_threshold)
     c.sample_size = on.get("sample_size", c.sample_size)
