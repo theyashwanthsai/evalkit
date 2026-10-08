@@ -1,3 +1,4 @@
+agent_name: jobs-langgraph
 agent: my_agent:answer
 datasets: ["../shared/evals/datasets/*.jsonl"]
 judges_dir: ../shared/evals/judges

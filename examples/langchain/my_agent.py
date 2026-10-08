@@ -1,5 +1,6 @@
 import sys; sys.path.insert(0, "../shared")
 import jobs
+import evalkit
 from evalkit import record_trace
 from langchain.agents import create_agent
 from langchain_core.tools import tool
@@ -16,6 +17,7 @@ def answer(user_input: str) -> dict:
 
 def serve(user_input: str) -> str:
     """Production entrypoint: same agent, plus a trace tagged with the git version for online evals."""
-    r = answer(user_input)
-    record_trace(user_input, r["output"], steps=r["steps"])
+    with evalkit.run():   # links traces if this agent is called by, or calls, another agent
+        r = answer(user_input)
+        record_trace(user_input, r["output"], steps=r["steps"])
     return r["output"]
