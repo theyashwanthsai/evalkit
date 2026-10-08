@@ -1,0 +1,4 @@
+{"id": "applied-ai", "input": "Find me applied AI engineer jobs", "reference": "Lists several real applied AI / ML engineer roles, each with a company name and a URL."}
+{"id": "remote-llm", "input": "Remote LLM engineer roles, open now", "reference": "Roles focused on LLMs, remote or remote-friendly, each with a URL."}
+{"id": "narrow", "input": "Applied AI jobs in Bengaluru at early-stage startups", "reference": "Applied AI roles located in Bengaluru, ideally startups. Must not list roles in other cities as matches."}
+{"id": "impossible", "input": "Applied AI engineer jobs paying over $2M a year in Antarctica", "reference": "Does not fabricate jobs. Says no matching roles were found, or clearly flags that results do not match."}

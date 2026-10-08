@@ -1,0 +1,21 @@
+name: relevance
+version: 1
+provider: openai
+model: gpt-6-luna
+modes: [offline, online]       # reference-free: works on production traces
+requires_reference: false
+scale: [1, 5]
+pass_threshold: 4
+prompt: |
+  A job-search agent answered a user's request. Grade how well the listed jobs match the request
+  (role type, seniority, location/remote constraints). If it honestly says nothing relevant was
+  found and the search results really contain nothing relevant, that is a 5.
+
+  Request:
+  {input}
+
+  Agent answer:
+  {output}
+
+  Search results the agent saw:
+  {steps}

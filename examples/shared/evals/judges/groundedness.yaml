@@ -1,0 +1,18 @@
+name: groundedness
+version: 1
+provider: openai
+model: gpt-6-luna
+modes: [offline, online]
+requires_reference: false
+scale: [1, 5]
+pass_threshold: 4
+prompt: |
+  Check whether a job-search agent invented anything. Every job and URL in the answer must appear
+  in the search results below. 5 = every job and URL is in the results; 3 = some unsupported
+  detail; 1 = invented jobs or links. An answer with no search call at all is a 1.
+
+  Agent answer:
+  {output}
+
+  Search results the agent saw:
+  {steps}

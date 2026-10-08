@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "evalkit"
+version = "0.1.0"
+description = "Git-native offline + online evals for agents, with an LLM judge."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["pyyaml>=6", "python-dotenv>=1"]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.40"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+evalkit = "evalkit.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/evalkit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,19 @@
+name: meets_request
+version: 1
+provider: openai
+model: gpt-6-luna
+modes: [offline]               # needs a reference, so offline only
+requires_reference: true
+scale: [1, 5]
+pass_threshold: 4
+prompt: |
+  Request:
+  {input}
+
+  What a good answer must satisfy:
+  {reference}
+
+  Agent answer:
+  {output}
+
+  Score 1-5 for whether the answer satisfies those requirements.
