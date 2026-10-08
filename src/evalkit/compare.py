@@ -16,7 +16,8 @@ def _per_example(result: dict, judge: str) -> dict[str, float]:
 def find_baseline(results: list[dict], current: dict, baseline_version: str | None = None) -> dict | None:
     """Latest result of another version on the same dataset (preferring identical dataset hash)."""
     cands = [r for r in results
-             if r["dataset"] == current["dataset"] and r["agent_version"] != current["agent_version"]
+             if r.get("agent", "default") == current.get("agent", "default")
+             and r["dataset"] == current["dataset"] and r["agent_version"] != current["agent_version"]
              and r["timestamp"] < current["timestamp"]]
     if baseline_version:
         cands = [r for r in cands if r["agent_version"] == baseline_version]

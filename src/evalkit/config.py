@@ -8,7 +8,8 @@ import yaml
 
 @dataclass
 class Config:
-    agent: str = ""
+    agent: str = ""                 # module:function the offline eval calls
+    agent_name: str = "default"     # name used to namespace traces/results/versions
     traces_dir: str = ".traces"
     results_dir: str = ".evals/results"
     datasets: list[str] = field(default_factory=lambda: ["evals/datasets/*.jsonl"])
@@ -27,7 +28,7 @@ def load_config(path: str | Path = "evalkit.yaml") -> Config:
     d = yaml.safe_load(p.read_text()) or {}
     off, on = d.get("offline", {}), d.get("online", {})
     c = Config()
-    for k in ("agent", "traces_dir", "results_dir", "datasets", "judges_dir"):
+    for k in ("agent", "agent_name", "traces_dir", "results_dir", "datasets", "judges_dir"):
         if k in d:
             setattr(c, k, d[k])
     c.repeats = off.get("repeats", c.repeats)

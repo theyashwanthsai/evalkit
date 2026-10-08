@@ -130,3 +130,48 @@ def test_version_path_scoped_tags(tmp_path, monkeypatch):
     g("tag", "jobs-agent/v1.2"); g("tag", "other-agent/v9")
     assert version.agent_version("jobs-agent", cwd=str(tmp_path)) == "jobs-agent/v1.2"
     assert version.agent_version("other-agent", cwd=str(tmp_path)) == "other-agent/v9"
+
+
+def test_traces_namespaced_by_agent(proj, monkeypatch):
+    monkeypatch.setenv("EVALKIT_VERSION", "v1")
+    record_trace("a", "x", agent="jobs")
+    record_trace("b", "y", agent="support")
+    assert (proj / ".traces/jobs").exists() and (proj / ".traces/support").exists()
+    assert [t["input"] for t in load_traces(".traces", "jobs")] == ["a"]
+    assert len(load_traces(".traces")) == 2
+
+
+def test_online_only_reads_its_agent_and_skips_unknown(proj, monkeypatch):
+    (proj / "evalkit.yaml").write_text("agent: agentmod:run\nagent_name: jobs\n")
+    monkeypatch.setenv("EVALKIT_VERSION", "v1")
+    record_trace("a", "good", agent="jobs")
+    record_trace("b", "good", agent="support")
+    record_trace("c", "good", agent="jobs", version="unknown")
+    assert main(["online"]) == 0
+    res = json.loads(next((proj / ".evals/results/online").glob("jobs__*.json")).read_text())
+    assert res["agent"] == "jobs" and res["sampled"] == 1
+
+
+def test_run_links_nested_agents(proj, monkeypatch):
+    import evalkit
+    monkeypatch.setenv("EVALKIT_VERSION", "v1")
+    with evalkit.run():
+        with evalkit.run():
+            child = record_trace("sub", "r", agent="researcher")
+        parent = record_trace("q", "a", agent="orchestrator")
+    assert child["run_id"] == parent["run_id"] == parent["id"]
+    assert child["parent_id"] == parent["id"] and parent["parent_id"] is None
+    assert record_trace("solo", "x")["parent_id"] is None
+
+
+def test_redact_hook(proj, monkeypatch):
+    import evalkit
+    monkeypatch.setenv("EVALKIT_VERSION", "v1")
+    evalkit.configure(redact=lambda t: {**t, "input": "<redacted>"})
+    try:
+        t = record_trace("my email is a@b.com", "ok")
+    finally:
+        from evalkit import settings
+        settings._state["redact"] = None
+    assert t["input"] == "<redacted>"
+    assert load_traces()[0]["input"] == "<redacted>"

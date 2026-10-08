@@ -37,7 +37,7 @@ def run_offline(cfg: Config, version: str | None = None) -> list[tuple[dict, str
     judges = load_judges(cfg.judges_dir, "offline")
     if not judges:
         raise ValueError(f"No offline judges found in {cfg.judges_dir}")
-    version = version or agent_version()
+    version = version or agent_version(cfg.agent_name)
     out = []
     for pattern in cfg.datasets:
         for path in sorted(glob.glob(pattern)):
@@ -55,12 +55,12 @@ def run_offline(cfg: Config, version: str | None = None) -> list[tuple[dict, str
                         scores.append({"example_id": ex["id"], "repeat": rep, "judge": j.id, "output": output, **g})
             ts = datetime.now(timezone.utc)
             result = {
-                "kind": "offline", "timestamp": ts.isoformat(), "agent_version": version,
+                "kind": "offline", "agent": cfg.agent_name, "timestamp": ts.isoformat(), "agent_version": version,
                 "dataset": dname, "dataset_hash": dhash,
                 "judges": {j.id: j.hash for j in judges},
                 "scores": scores, "summary": summarize(scores),
             }
-            name = f"{version}__{dname}__{ts.strftime('%Y%m%dT%H%M%S%f')}".replace("/", "-")
+            name = f"{cfg.agent_name}__{version}__{dname}__{ts.strftime('%Y%m%dT%H%M%S%f')}".replace("/", "-")
             out.append((result, str(save_result(cfg.results_dir, "offline", name, result))))
     if not out:
         raise ValueError(f"No datasets matched {cfg.datasets}")

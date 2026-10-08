@@ -5,10 +5,38 @@ import json
 import random
 import time
 import uuid
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import settings
 from .version import agent_version
+
+
+@dataclass
+class RunCtx:
+    id: str
+    run_id: str
+    parent_id: str | None
+    used: bool = False
+
+
+_ctx: ContextVar[RunCtx | None] = ContextVar("evalkit_run", default=None)
+
+
+@contextmanager
+def run():
+    """Wrap an agent's serve(). Agents called inside it (which also use run()) get the same run_id
+    and this agent's trace id as their parent_id, so a multi-agent request can be stitched together."""
+    cur, tid = _ctx.get(), uuid.uuid4().hex[:12]
+    ctx = RunCtx(tid, cur.run_id if cur else tid, cur.id if cur else None)
+    token = _ctx.set(ctx)
+    try:
+        yield ctx
+    finally:
+        _ctx.reset(token)
 
 
 def record_trace(
@@ -18,29 +46,42 @@ def record_trace(
     steps: list | None = None,
     error: str | None = None,
     metadata: dict | None = None,
-    traces_dir: str | Path = ".traces",
+    agent: str | None = None,
     version: str | None = None,
 ) -> dict:
     """Call this from your agent in production to write a trace."""
-    now = datetime.now(timezone.utc)
+    agent = agent or settings.get_agent()
+    ctx = _ctx.get()
+    if ctx and not ctx.used:
+        ctx.used, (tid, run_id, parent_id) = True, (ctx.id, ctx.run_id, ctx.parent_id)
+    else:
+        tid = uuid.uuid4().hex[:12]
+        run_id, parent_id = (ctx.run_id, ctx.parent_id) if ctx else (tid, None)
     trace = {
-        "id": uuid.uuid4().hex[:12],
-        "timestamp": now.isoformat(),
-        "agent_version": version or agent_version(),
+        "id": tid,
+        "run_id": run_id,
+        "parent_id": parent_id,
+        "agent": agent,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "agent_version": version or agent_version(agent),
         "input": input,
         "output": output,
         "steps": steps or [],
         "error": error,
         "metadata": metadata or {},
     }
-    day_dir = Path(traces_dir) / now.strftime("%Y-%m-%d")
-    day_dir.mkdir(parents=True, exist_ok=True)
-    (day_dir / f"{trace['id']}.json").write_text(json.dumps(trace, indent=2, default=str))
+    redact = settings.get_redact()
+    if redact:
+        trace = redact(trace)
+    settings.get_sink().write(trace)
     return trace
 
 
-def load_traces(traces_dir: str | Path = ".traces") -> list[dict]:
+def load_traces(traces_dir: str | Path = ".traces", agent: str | None = None) -> list[dict]:
+    """Read traces (.json and .jsonl). With `agent`, only that agent's folder/traces."""
     root = Path(traces_dir)
+    if agent:
+        root = root / agent
     traces: list[dict] = []
     if not root.exists():
         return traces
@@ -56,7 +97,7 @@ def load_traces(traces_dir: str | Path = ".traces") -> list[dict]:
                     traces.append(json.loads(line))
                 except json.JSONDecodeError:
                     continue
-    return traces
+    return [t for t in traces if not agent or t.get("agent", "default") == agent]
 
 
 def _ts(trace: dict) -> float:
