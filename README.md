@@ -82,7 +82,7 @@ traces:
 ```
 
 Or set `EVALKIT_TRACES_REPO`. A failed flush never touches the request: traces stay queued and retry.
-In serverless, call `settings.get_sink().flush()` before returning, background threads get killed.
+In serverless, call `evalkit.flush()` before returning, background threads get killed.
 
 A separate repo keeps trace commits out of your code history, and the token on the server can't push code.
 The daily online workflow checks that repo out and runs `evalkit online --traces-dir traces`.

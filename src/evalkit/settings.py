@@ -44,3 +44,8 @@ def get_sink() -> Sink:
             sink = LocalSink(cfg.traces_dir)
         _cached = (spec, sink)
     return _cached[1]
+
+
+def flush() -> None:
+    """Send any queued traces now. Call before returning in serverless handlers."""
+    get_sink().flush()

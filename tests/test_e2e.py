@@ -253,3 +253,8 @@ def test_online_traces_dir_flag(proj, monkeypatch):
     assert main(["online"]) == 0 and not (proj / ".evals/results/online").exists()
     assert main(["online", "--traces-dir", "elsewhere"]) == 0
     assert any((proj / ".evals/results/online").glob("*.json"))
+
+
+def test_flush_is_exported_and_safe_for_local_sink(proj):
+    import evalkit
+    evalkit.flush()   # LocalSink: no-op, must not raise
