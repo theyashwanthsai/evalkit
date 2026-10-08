@@ -243,3 +243,13 @@ def test_sink_chosen_from_config(proj, monkeypatch):
     (proj / "evalkit.yaml").write_text("agent_name: jobs\ntraces:\n  sink: github\n  repo: me/traces\n  branch: main\n")
     s = settings.get_sink()
     assert isinstance(s, GitHubSink) and s.repo == "me/traces" and s.branch == "main"
+
+
+def test_online_traces_dir_flag(proj, monkeypatch):
+    monkeypatch.setenv("EVALKIT_VERSION", "v1")
+    record_trace("q", "good")
+    import shutil
+    shutil.move(".traces", "elsewhere")
+    assert main(["online"]) == 0 and not (proj / ".evals/results/online").exists()
+    assert main(["online", "--traces-dir", "elsewhere"]) == 0
+    assert any((proj / ".evals/results/online").glob("*.json"))

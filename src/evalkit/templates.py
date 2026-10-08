@@ -1,5 +1,10 @@
-CONFIG = """agent: my_agent:run          # module:function, takes input, returns str or {"output":..., "steps":[...]}
-traces_dir: .traces
+CONFIG = """agent_name: my-agent         # namespaces traces, results and versions
+agent: my_agent:answer       # module:function the offline eval calls          # must return {"output": ..., "steps": [...]}
+traces_dir: .traces            # where online evals read traces from
+# In production, send traces to a separate (private) repo instead of local files:
+# traces:
+#   sink: github
+#   repo: you/my-agent-traces   # needs GITHUB_TOKEN with contents:write on that repo
 results_dir: .evals/results
 datasets: ["evals/datasets/*.jsonl"]
 judges_dir: evals/judges
@@ -57,13 +62,21 @@ DATASET = """{"id": "greet", "input": "Say hello", "reference": "A friendly gree
 {"id": "math", "input": "What is 2+2?", "reference": "4"}
 """
 
-AGENT = '''from evalkit import record_trace
+AGENT = '''import evalkit
+from evalkit import record_trace
 
 
-def run(user_input: str) -> str:
-    output = f"echo: {user_input}"  # replace with your agent
-    record_trace(user_input, output)  # writes .traces/<date>/<id>.json tagged with the git version
-    return output
+def answer(user_input: str) -> dict:
+    """What `evalkit offline` calls. No trace is written here."""
+    return {"output": f"echo: {user_input}", "steps": []}  # replace with your agent
+
+
+def serve(user_input: str) -> str:
+    """What production calls: same agent plus a trace tagged with agent name and version."""
+    with evalkit.run():
+        r = answer(user_input)
+        record_trace(user_input, r["output"], steps=r["steps"])
+    return r["output"]
 '''
 
 WF_OFFLINE = """name: evalkit-offline
@@ -113,11 +126,16 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-python@v5
         with: { python-version: "3.11" }
+      - uses: actions/checkout@v4          # your separate traces repo, read-only token is enough
+        with:
+          repository: you/my-agent-traces
+          token: ${{ secrets.TRACES_TOKEN }}
+          path: traces
       - run: pip install "evalkit[anthropic]"
       - name: Judge a sample of production traces
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: evalkit online
+        run: evalkit online --traces-dir traces
       - name: Commit results
         run: |
           git config user.name "evalkit[bot]"; git config user.email "evalkit@users.noreply.github.com"

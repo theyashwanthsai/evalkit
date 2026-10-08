@@ -58,6 +58,8 @@ def cmd_offline(args) -> int:
 def cmd_online(args) -> int:
     from .online import run_online
     cfg = load_config(args.config)
+    if args.traces_dir:
+        cfg.traces_dir = args.traces_dir
     r = run_online(cfg, seed=args.seed)
     if r is None:
         print("No new traces to sample in the window.")
@@ -100,6 +102,7 @@ def main(argv=None) -> int:
 
     s = sub.add_parser("online", help="judge a sample of production traces")
     s.add_argument("--seed", type=int)
+    s.add_argument("--traces-dir", help="read traces from here (e.g. a checkout of your traces repo)")
     s.set_defaults(fn=cmd_online)
 
     sub.add_parser("report", help="score history per version").set_defaults(fn=cmd_report)
