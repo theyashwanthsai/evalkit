@@ -32,7 +32,7 @@ def cmd_offline(args) -> int:
     cfg = load_config(args.config)
     prior = load_results(cfg.results_dir, "offline") if args.compare else []
     md, regressed = [], False
-    for result, path in run_offline(cfg, version=args.version):
+    for result, path in run_offline(cfg, version=args.version, checkpoint=args.checkpoint, resume=args.resume, repeat_uncertain=args.repeat_uncertain, evaluation_version=args.evaluation_version):
         print(f"[{result['dataset']}] {result['agent_version']} -> {path}")
         for j, s in result["summary"].items():
             print(f"  {j}: mean={s['mean']} pass_rate={s['pass_rate']} n={s['n']} unparsed={s['failed_to_parse']}")
@@ -94,6 +94,11 @@ def main(argv=None) -> int:
 
     s = sub.add_parser("offline", help="run datasets through the agent and judge")
     s.add_argument("--version", help="override agent version (default: git describe)")
+    runs = s.add_mutually_exclusive_group()
+    runs.add_argument("--checkpoint", metavar="RUN_ID", help="start a new checkpointed run")
+    runs.add_argument("--resume", metavar="RUN_ID", help="resume an existing checkpointed run")
+    s.add_argument("--evaluation-version", help="explicit version of provider/custom evaluation configuration")
+    s.add_argument("--repeat-uncertain", action="store_true", help="repeat unresolved pending calls on resume; may duplicate side effects/cost")
     s.add_argument("--compare", action="store_true", help="compare against previous version's result")
     s.add_argument("--baseline", help="baseline agent version (default: latest other version)")
     s.add_argument("--fail-on-regression", action="store_true")
@@ -110,7 +115,12 @@ def main(argv=None) -> int:
 
     load_dotenv(find_dotenv(usecwd=True), override=True)
     args = p.parse_args(argv)
-    return args.fn(args)
+    from .checkpoint_io import CheckpointError
+    try:
+        return args.fn(args)
+    except CheckpointError as exc:
+        print(f"Checkpoint error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

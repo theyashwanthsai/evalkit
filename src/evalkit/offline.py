@@ -31,8 +31,11 @@ def load_dataset(path: str) -> tuple[list[dict], str]:
     return rows, hashlib.sha256(raw).hexdigest()[:10]
 
 
-def run_offline(cfg: Config, version: str | None = None) -> list[tuple[dict, str]]:
+def run_offline(cfg: Config, version: str | None = None, *, checkpoint: str | None = None, resume: str | None = None, repeat_uncertain: bool = False, evaluation_version: str | None = None) -> list[tuple[dict, str]]:
     """Returns [(result, saved_path)] one per dataset."""
+    if checkpoint is not None or resume is not None or repeat_uncertain:
+        from .resumable import run_checkpointed
+        return run_checkpointed(cfg, version, run_id=checkpoint, resume=resume, repeat_uncertain=repeat_uncertain, evaluation_version=evaluation_version)
     agent = load_agent(cfg.agent)
     judges = load_judges(cfg.judges_dir, "offline")
     if not judges:

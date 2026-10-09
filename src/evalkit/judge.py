@@ -50,13 +50,17 @@ class Judge:
         )
         return body + JSON_SUFFIX % self.scale
 
-    def grade(self, *, input, output, reference=None, steps=None) -> dict:
-        lo, hi = self.scale
-        text = providers.complete(
+    def request(self, *, input, output, reference=None, steps=None) -> str:
+        return providers.complete(
             self.provider, self.model,
             self.render(input=input, output=output, reference=reference, steps=steps),
         )
-        score, reasoning = parse_judgement(text, lo, hi)
+
+    def grade(self, *, input, output, reference=None, steps=None) -> dict:
+        return self.parse_response(self.request(input=input, output=output, reference=reference, steps=steps))
+
+    def parse_response(self, text: str) -> dict:
+        score, reasoning = parse_judgement(text, *self.scale)
         return {"score": score, "reasoning": reasoning, "passed": score is not None and score >= self.pass_threshold}
 
 
