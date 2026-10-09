@@ -140,6 +140,10 @@ evalkit offline
 - The Anthropic provider is untested. OpenAI is what I've actually used.
 - There's no judge calibration. Nothing tells you whether a judge agrees with a human.
 
+## Resumable offline runs
+
+Opt in with `evalkit offline --checkpoint RUN_ID --version AGENT_VERSION --evaluation-version CONFIG_VERSION`. Resume with `--resume RUN_ID` and the same versions. Uncertain pending calls stop by default. See [Resumable offline evaluations](RESUMING.md) for compatibility, ownership, durability and recovery rules.
+
 ## Tests
 
 ```bash
