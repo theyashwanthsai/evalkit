@@ -27,6 +27,13 @@ def load_results(results_dir: str, kind: str) -> list[dict]:
     return sorted(out, key=lambda r: r.get("timestamp", ""))
 
 
+def load_latest_online_result(results_dir: str, agent: str | None = None) -> dict | None:
+    rows = load_results(results_dir, "online")
+    if agent:
+        rows = [r for r in rows if r.get("agent") == agent]
+    return rows[-1] if rows else None
+
+
 def summarize(scores: list[dict]) -> dict:
     """{judge_id: {mean, pass_rate, n}} ignoring unparseable (score=None)."""
     by: dict[str, list[dict]] = {}

@@ -72,6 +72,32 @@ def cmd_online(args) -> int:
     return 0
 
 
+def cmd_harvest(args) -> int:
+    from .harvest import run_harvest
+    cfg = load_config(args.config)
+    if args.traces_dir:
+        cfg.traces_dir = args.traces_dir
+    run_harvest(
+        cfg,
+        min_score=args.min_score,
+        max_count=args.max_count,
+        output=args.output,
+        auto=args.auto,
+    )
+    return 0
+
+
+def cmd_calibrate(args) -> int:
+    from .calibrate import run_calibrate_cli
+    cfg = load_config(args.config)
+    return run_calibrate_cli(
+        cfg,
+        labels_path=args.labels,
+        min_agreement=args.min_agreement,
+        markdown=args.markdown,
+    )
+
+
 def cmd_report(args) -> int:
     print(build_report(load_config(args.config).results_dir))
     return 0
@@ -104,6 +130,24 @@ def main(argv=None) -> int:
     s.add_argument("--seed", type=int)
     s.add_argument("--traces-dir", help="read traces from here (e.g. a checkout of your traces repo)")
     s.set_defaults(fn=cmd_online)
+
+    s = sub.add_parser("harvest", help="promote bad online traces into the offline dataset")
+    s.add_argument("--min-score", type=int, default=2, help="include if any judge score is at or below this")
+    s.add_argument("--max-count", type=int, default=20)
+    s.add_argument("--output", default="evals/datasets/harvested.jsonl")
+    s.add_argument("--auto", action="store_true", help="non-interactive: use trace output as reference")
+    s.add_argument("--traces-dir", help="read traces from here")
+    s.set_defaults(fn=cmd_harvest)
+
+    s = sub.add_parser("calibrate", help="compare human labels to stored judge scores")
+    s.add_argument("--labels", default="evals/human_labels.jsonl", help="human score labels (JSONL)")
+    s.add_argument(
+        "--min-agreement",
+        type=float,
+        help="exit 1 if any judge's exact-match rate is below this (0-1)",
+    )
+    s.add_argument("--markdown", help="write report markdown to this file")
+    s.set_defaults(fn=cmd_calibrate)
 
     sub.add_parser("report", help="score history per version").set_defaults(fn=cmd_report)
     sub.add_parser("version", help="print resolved agent version").set_defaults(fn=cmd_version)
