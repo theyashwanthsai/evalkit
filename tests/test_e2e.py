@@ -245,6 +245,73 @@ def test_sink_chosen_from_config(proj, monkeypatch):
     assert isinstance(s, GitHubSink) and s.repo == "me/traces" and s.branch == "main"
 
 
+def test_harvest_auto_adds_low_scores(proj, monkeypatch):
+    monkeypatch.setenv("EVALKIT_VERSION", "v1")
+    record_trace("good-q", "good")
+    record_trace("bad-q", "bad")
+    main(["online", "--seed", "1"])
+    out_path = proj / "evals/datasets/harvested.jsonl"
+    assert main(["harvest", "--auto", "--output", str(out_path)]) == 0
+    lines = out_path.read_text().strip().splitlines()
+    assert len(lines) == 1
+    row = json.loads(lines[0])
+    assert row["id"].startswith("harvest-")
+    assert row["input"] == "bad-q"
+    assert row["metadata"]["trace_id"]
+    assert row["metadata"]["judge_scores"]
+    assert main(["harvest", "--auto", "--output", str(out_path)]) == 0
+    assert len(out_path.read_text().strip().splitlines()) == 1
+
+
+def test_calibrate_offline(proj, monkeypatch):
+    monkeypatch.setenv("OUT", "good")
+    labels = proj / "evals/human_labels.jsonl"
+    labels.write_text(
+        "\n".join(
+            [
+                json.dumps({"example_id": "e0", "judge": "quality@v1", "human_score": 5}),
+                json.dumps({"example_id": "e1", "judge": "quality@v1", "human_score": 2}),
+            ]
+        )
+        + "\n"
+    )
+    main(["offline", "--version", "v1"])
+    assert main(["calibrate", "--labels", str(labels)]) == 0
+
+
+def test_calibrate_fails_min_agreement(proj, monkeypatch):
+    monkeypatch.setenv("OUT", "good")
+    labels = proj / "evals/human_labels.jsonl"
+    labels.write_text(json.dumps({"example_id": "e0", "judge": "quality@v1", "human_score": 1}) + "\n")
+    main(["offline", "--version", "v1"])
+    assert main(["calibrate", "--labels", str(labels), "--min-agreement", "0.99"]) == 1
+
+
+def test_calibrate_online_trace_id(proj, monkeypatch):
+    monkeypatch.setenv("EVALKIT_VERSION", "v1")
+    t = record_trace("q", "bad")
+    labels = proj / "evals/human_labels.jsonl"
+    labels.write_text(json.dumps({"trace_id": t["id"], "judge": "quality@v1", "human_score": 2}) + "\n")
+    main(["online", "--seed", "1"])
+    assert main(["calibrate", "--labels", str(labels)]) == 0
+
+
+def test_human_labels_validation(proj):
+    from evalkit.calibrate import load_human_labels
+    p = proj / "evals/human_labels.jsonl"
+    p.write_text(json.dumps({"example_id": "e0", "trace_id": "x", "judge": "j", "human_score": 1}) + "\n")
+    with pytest.raises(ValueError, match="exactly one"):
+        load_human_labels(p)
+
+
+def test_harvest_no_candidates_when_all_pass(proj, monkeypatch):
+    monkeypatch.setenv("EVALKIT_VERSION", "v1")
+    record_trace("q", "good")
+    main(["online", "--seed", "1"])
+    assert main(["harvest", "--auto"]) == 0
+    assert not (proj / "evals/datasets/harvested.jsonl").exists()
+
+
 def test_online_traces_dir_flag(proj, monkeypatch):
     monkeypatch.setenv("EVALKIT_VERSION", "v1")
     record_trace("q", "good")

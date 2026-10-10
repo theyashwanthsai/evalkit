@@ -28,6 +28,8 @@ evalkit init                    # drops in evalkit.yaml, example judges, a datas
 evalkit offline                 # run datasets through your agent, judge, save results
 evalkit offline --compare       # also compare against the previous version
 evalkit online                  # judge a sample of traces
+evalkit harvest                 # turn low-scoring traces into dataset entries (human review)
+evalkit calibrate               # compare human labels to LLM judge scores
 evalkit report                  # scores per agent and version
 ```
 
@@ -62,6 +64,13 @@ The prompt can use `{input}`, `{output}`, `{reference}` and `{steps}`.
 
 A judge that needs a reference answer is offline only. Production traces don't have one, and evalkit
 errors if you enable such a judge for online.
+
+### Calibrating judges
+
+Add `evals/human_labels.jsonl` with one JSON object per line — your score for a case the LLM judge
+also graded (same 1–5 scale). Use `example_id` for offline dataset rows or `trace_id` for production
+traces after `evalkit online`. Then run `evalkit calibrate` to see agreement, pass/fail match, and
+whether the judge runs lenient or harsh vs you (`mean(judge−human)`).
 
 ## Traces
 
@@ -136,9 +145,9 @@ evalkit offline
 
 - The GitHub workflows from `evalkit init` have not been run in CI yet.
 - `GitHubSink` is tested against a local fake of the GitHub API, not the real one.
-- Failed online traces don't turn into dataset entries yet. That's the next thing I want.
+- `evalkit harvest` is new; the interactive flow hasn't seen much real use yet.
 - The Anthropic provider is untested. OpenAI is what I've actually used.
-- There's no judge calibration. Nothing tells you whether a judge agrees with a human.
+- Judge calibration is basic (`evalkit calibrate` + `evals/human_labels.jsonl`); no inter-rater tooling yet.
 
 ## Tests
 

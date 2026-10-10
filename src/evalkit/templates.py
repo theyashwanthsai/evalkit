@@ -62,6 +62,10 @@ DATASET = """{"id": "greet", "input": "Say hello", "reference": "A friendly gree
 {"id": "math", "input": "What is 2+2?", "reference": "4"}
 """
 
+HUMAN_LABELS = """{"example_id": "greet", "judge": "helpfulness@v1", "human_score": 4, "note": "replace with your score after reading outputs"}
+{"example_id": "math", "judge": "helpfulness@v1", "human_score": 5}
+"""
+
 AGENT = '''import evalkit
 from evalkit import record_trace
 
@@ -148,6 +152,7 @@ FILES = {
     "evals/judges/helpfulness.yaml": JUDGE_HELPFUL,
     "evals/judges/correctness.yaml": JUDGE_CORRECT,
     "evals/datasets/smoke.jsonl": DATASET,
+    "evals/human_labels.jsonl": HUMAN_LABELS,
     "my_agent.py": AGENT,
     ".github/workflows/evalkit-offline.yml": WF_OFFLINE,
     ".github/workflows/evalkit-online.yml": WF_ONLINE,
